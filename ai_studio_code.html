@@ -3,418 +3,1436 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Tool: BroadbandMap Lookup</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
+    <title>BroadbandMap Resolver · Agent Tooling v2</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
-        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* ── Design tokens ──────────────────────────────────────── */
+        :root {
+            /* Foundations & Backgrounds */
+            --bg-base:       #050508;
+            --bg-surface:    #0a0a0f;
+            --bg-card:       #121214;
+            --bg-elevated:   #0f172a;
+            --bg-slate-navy: #1e1b4b;
+
+            /* Borders */
+            --border-sub:    #1e293b;
+            --border-mid:    #334155;
+
+            /* Typography */
+            --text-1:        #f8fafc;
+            --text-2:        #e2e8f0;
+            --text-3:        #94a3b8;
+            --text-4:        #64748b;
+            --text-muted:    #475569;
+
+            /* Interactive & primary accents */
+            --blue:          #06b6d4;
+            --blue-dim:      rgba(6,182,212,.2);
+            --blue-glow:     rgba(6,182,212,.2);
+            --green:         #adff2f;
+            --green-dim:     rgba(173,255,47,.14);
+            --amber:         #f59e0b;
+            --amber-dim:     rgba(245,158,11,.15);
+            --red:           #f43f5e;
+            --red-dim:       rgba(244,63,94,.14);
+            --purple:        #8b5cf6;
+            --purple-dim:    rgba(139,92,246,.16);
+            --pink:          #14b8a6;
+            --pink-dim:      rgba(20,184,166,.15);
+
+            /* Utility glows */
+            --violet-glow:   rgba(139,92,246,.3);
+            --prism-10:      rgba(255,255,255,.1);
+            --prism-05:      rgba(255,255,255,.05);
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        .hidden { display: none !important; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-base);
+            background-image:
+                radial-gradient(ellipse 120% 50% at 50% -8%, rgba(139,92,246,.13) 0%, transparent 62%);
+            color: var(--text-1);
+            min-height: 100vh;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .mono { font-family: 'JetBrains Mono', 'Cascadia Code', monospace; }
+
+        /* ── Scrollbar ───────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 4px; }
+
+        /* ── Keyframes ───────────────────────────────────────────── */
+        @keyframes fadeUp   { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes spin     { to { transform:rotate(360deg); } }
+        @keyframes pulse-dot {
+            0%,100% { box-shadow: 0 0 0 0 rgba(13,206,116,.5); }
+            50%     { box-shadow: 0 0 0 5px rgba(13,206,116,0); }
+        }
+        @keyframes shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position:  400px 0; }
+        }
+        @keyframes header-glow {
+            0%,100% { opacity:.6; }
+            50%     { opacity:1; }
+        }
+
+        .anim-fade-up { animation: fadeUp .35s cubic-bezier(.22,.68,0,1.2) both; }
+
+        /* ── Spinner ─────────────────────────────────────────────── */
+        .spinner {
+            width:20px; height:20px;
+            border:2px solid var(--border-mid);
+            border-top-color: var(--blue);
+            border-radius:50%;
+            animation: spin .65s linear infinite;
+            flex-shrink:0;
+        }
+        .spinner-lg { width:36px; height:36px; border-width:3px; }
+
+        /* ── Live dot ────────────────────────────────────────────── */
+        .live-dot {
+            width:7px; height:7px;
+            background: var(--green);
+            border-radius:50%;
+            animation: pulse-dot 2s ease infinite;
+        }
+
+        /* ── Top nav ─────────────────────────────────────────────── */
+        .topnav {
+            position: sticky; top:0; z-index:100;
+            background: rgba(6,7,15,.92);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-sub);
+            box-shadow: 0 1px 0 rgba(255,255,255,.04);
+        }
+        .topnav-inner {
+            max-width:1200px; margin:0 auto;
+            padding:0 24px;
+            height:54px;
+            display:flex; align-items:center; justify-content:space-between; gap:16px;
+        }
+
+        .brand          { display:flex; align-items:center; gap:10px; text-decoration:none; }
+        .brand-icon     { background:linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding:7px; border-radius:9px; display:flex; box-shadow:0 2px 12px rgba(139,92,246,.3); }
+        .brand-name     { font-size:14px; font-weight:700; letter-spacing:-.02em; color:var(--text-1); }
+        .brand-name em  { font-style:normal; color:var(--blue); }
+        .pill-badge     { background:var(--blue-dim); border:1px solid rgba(77,142,255,.25); color:var(--blue);
+                          font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; letter-spacing:.04em; }
+
+        /* ── Rate limit bar ─────────────────────────────────────── */
+        .rate-wrap    { display:flex; align-items:center; gap:8px; }
+        .rate-label   { font-size:11px; color:var(--text-3); }
+        .rate-track   { width:72px; height:3px; background:var(--border-sub); border-radius:2px; overflow:hidden; }
+        .rate-fill    { height:100%; border-radius:2px; transition:width .5s ease, background .4s ease; }
+        .rate-text    { font-size:11px; color:var(--text-2); min-width:48px; text-align:right; }
+
+        /* ── Header hero ─────────────────────────────────────────── */
+        .hero {
+            padding: 72px 24px 96px;
+            text-align:center;
+            position:relative; overflow:visible;
+        }
+        .hero-glow {
+            position:absolute; top:-60px; left:50%; transform:translateX(-50%);
+            width:1000px; height:500px;
+            background:radial-gradient(ellipse at center, rgba(139,92,246,.14) 0%, transparent 65%);
+            pointer-events:none;
+            animation: header-glow 4s ease infinite;
+        }
+        .hero-sub-chip {
+            display:inline-flex; align-items:center; gap:6px;
+            background:var(--blue-dim); border:1px solid rgba(77,142,255,.2);
+            padding:4px 12px; border-radius:20px; margin-bottom:22px;
+            font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--blue);
+        }
+        .hero-title {
+            font-size: clamp(26px,4.5vw,44px);
+            font-weight:800; letter-spacing:-.03em;
+            line-height:1.12; margin-bottom:18px;
+        }
+        .hero-title .grad {
+            background:linear-gradient(95deg, #f8fafc 0%, #c4b5fd 60%, #8b5cf6 100%);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+        }
+        .hero-desc {
+            font-size:15px; color:var(--text-2); max-width:460px;
+            margin:0 auto 40px; line-height:1.65;
+        }
+        .hero-desc code {
+            background:var(--bg-elevated); border:1px solid var(--border-sub);
+            padding:1px 7px; border-radius:5px; font-size:13px;
+            font-family:'JetBrains Mono',monospace; color:var(--text-1);
+        }
+
+        /* ── Search bar ──────────────────────────────────────────── */
+        .search-wrap {
+            position:relative; max-width:600px; margin:0 auto;
+        }
+        .search-input-row { position:relative; }
+        .search-icon {
+            position:absolute; left:16px; top:50%; transform:translateY(-50%);
+            pointer-events:none; color:var(--text-3);
+            transition:color .2s;
+        }
+        .search-input {
+            width:100%; padding:18px 56px;
+            background:rgba(24,32,58,.95); border:1.5px solid var(--border-mid);
+            border-radius:14px; color:var(--text-1); font-size:17px; font-weight:600;
+            font-family:'JetBrains Mono',monospace;
+            outline:none; transition:border-color .2s, box-shadow .2s;
+            box-shadow: 0 4px 24px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+        }
+        .search-input::placeholder { color:var(--text-2); font-size:15px; font-weight:500; }
+        .search-input:focus {
+            border-color:var(--blue);
+            box-shadow:0 0 0 3px var(--blue-glow), 0 4px 24px rgba(0,0,0,.5);
+        }
+        .search-input:focus + .search-icon { color:var(--blue); }
+
+        .search-right {
+            position:absolute; right:14px; top:50%; transform:translateY(-50%);
+            display:flex; align-items:center; gap:6px;
+        }
+        .cache-chip {
+            background:var(--green-dim); border:1px solid rgba(13,206,116,.25);
+            color:var(--green); font-size:9px; font-weight:700;
+            padding:2px 7px; border-radius:4px; letter-spacing:.05em;
+            font-family:'JetBrains Mono',monospace;
+        }
+
+        /* ── Dropdown ────────────────────────────────────────────── */
+        .dropdown {
+            position:absolute; z-index:200; width:100%; margin-top:6px;
+            background:var(--bg-elevated); border:1.5px solid var(--border-mid);
+            border-radius:12px; overflow:hidden; max-height:280px; overflow-y:auto;
+            box-shadow:0 28px 70px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.04);
+            text-align:left;
+        }
+        .dd-item {
+            padding:14px 18px; cursor:pointer;
+            border-bottom:1px solid var(--border-sub);
+            transition:background .15s, box-shadow .15s;
+        }
+        .dd-item:last-child { border-bottom:none; }
+        .dd-item:hover { background:rgba(26,200,255,.14); box-shadow: inset 3px 0 0 var(--blue); }
+        .dd-primary { font-size:17px; font-weight:700; color:var(--text-1); letter-spacing:-.01em; line-height:1.2; }
+        .dd-secondary { font-size:14px; color:var(--text-2); margin-top:5px; font-weight:500; line-height:1.35; }
+
+        /* ── Main panel ──────────────────────────────────────────── */
+        .main-wrap {
+            max-width:1200px; margin:0 auto;
+            padding:0 24px 80px;
+            margin-top:-52px; position:relative; z-index:1;
+        }
+        .panel {
+            background:var(--bg-surface);
+            border:1px solid var(--border-sub);
+            border-radius:20px; overflow:hidden; min-height:420px;
+            box-shadow: 0 4px 0 rgba(255,255,255,.03) inset, 0 32px 80px rgba(0,0,0,.55);
+        }
+        .panel-accent-line {
+            height:3px;
+            background:linear-gradient(90deg, transparent 0%, rgba(139,92,246,.7) 25%, rgba(139,92,246,.9) 50%, rgba(139,92,246,.7) 75%, transparent 100%);
+            opacity:1;
+        }
+
+        /* ── States ──────────────────────────────────────────────── */
+        .state {
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            padding:80px 32px; text-align:center;
+        }
+        .state.hidden { display:none !important; }
+
+        .state-icon-wrap {
+            padding:18px; border-radius:16px; margin-bottom:20px;
+            background:var(--bg-elevated); border:1px solid var(--border-mid);
+            box-shadow: 0 4px 16px rgba(0,0,0,.4);
+        }
+        .state-title { font-size:20px; font-weight:700; color:var(--text-1); margin-bottom:10px; letter-spacing:-.02em; }
+        .state-desc  { font-size:15px; color:var(--text-3); max-width:380px; line-height:1.65; }
+
+        .endpoint-chips { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:22px; }
+        .endpoint-chip  {
+            background:var(--bg-elevated); border:1px solid var(--border-sub);
+            padding:6px 12px; border-radius:7px; font-size:12px; color:var(--text-2);
+            font-family:'JetBrains Mono',monospace;
+        }
+
+        .error-box {
+            font-size:13px; color:var(--red);
+            background:var(--red-dim); border:1px solid rgba(255,84,107,.28);
+            padding:14px 22px; border-radius:10px; max-width:540px;
+            font-family:'JetBrains Mono',monospace; word-break:break-word; line-height:1.65;
+        }
+        .retry-btn {
+            margin-top:14px;
+            background:var(--blue-dim); border:1px solid rgba(77,142,255,.25);
+            color:var(--blue); padding:8px 20px; border-radius:8px;
+            font-size:13px; cursor:pointer; transition:background .2s;
+        }
+        .retry-btn:hover { background:rgba(77,142,255,.2); }
+
+        /* ── Results ─────────────────────────────────────────────── */
+        #state-results { display:none; padding:36px; }
+        #state-results.visible {
+            display:block;
+        }
+
+        /* Context bar */
+        .ctx-bar {
+            padding:20px 24px; border-radius:14px; margin-bottom:36px;
+            background:rgba(15,23,42,.6);
+            border:1px solid var(--border-sub);
+            display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between;
+            box-shadow: 0 2px 16px rgba(0,0,0,.4);
+        }
+        .ctx-left   { display:flex; align-items:center; gap:12px; }
+        .ctx-loc-icon {
+            background:rgba(139,92,246,.18); border:1px solid rgba(139,92,246,.28); padding:8px; border-radius:9px;
+            display:flex; flex-shrink:0;
+        }
+        .ctx-sublabel { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--text-3); margin-bottom:4px; }
+        .ctx-address  { font-size:18px; font-weight:600; color:var(--text-1); letter-spacing:-.02em; }
+        .ctx-right    { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        .coord-chip {
+            background:var(--bg-elevated); border:1px solid var(--border-mid);
+            padding:10px 16px; border-radius:10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.3);
+        }
+        .coord-val  { font-size:15px; font-weight:600; font-family:'JetBrains Mono',monospace; color:var(--text-1); }
+        .icon-btn {
+            background:var(--bg-elevated); border:1px solid var(--border-sub);
+            padding:7px; border-radius:8px; cursor:pointer;
+            color:var(--text-2); transition:border-color .2s, color .2s;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .icon-btn:hover { border-color:var(--border-mid); color:var(--text-1); }
+
+        .cached-badge-result {
+            background:var(--green-dim); border:1px solid rgba(13,206,116,.25);
+            color:var(--green); font-size:10px; font-weight:700;
+            padding:4px 10px; border-radius:5px; letter-spacing:.05em;
+            font-family:'JetBrains Mono',monospace;
+        }
+        /* Section header */
+        .section-head {
+            display:flex; align-items:center; gap:14px; margin-bottom:22px;
+        }
+        .section-icon {
+            background:var(--bg-elevated); border:1px solid var(--border-mid);
+            padding:10px; border-radius:12px; display:flex; flex-shrink:0;
+            box-shadow: 0 2px 10px rgba(0,0,0,.4);
+        }
+        .section-title   { font-size:20px; font-weight:700; color:var(--text-1); letter-spacing:-.02em; }
+        .section-sub     { font-size:12px; color:var(--text-3); margin-top:2px; }
+        .section-rule    { flex:1; height:1px; background:var(--border-mid); }
+        .section-count   { font-size:13px; color:var(--text-2); white-space:nowrap; font-family:'JetBrains Mono',monospace; font-weight:600; }
+
+        /* Provider card */
+        .pcard {
+            background:linear-gradient(160deg, rgba(30,41,59,.5) 0%, rgba(18,18,20,.96) 100%);
+            border:1px solid var(--border-sub);
+            border-radius:16px; padding:24px;
+            position:relative; overflow:hidden; isolation:isolate;
+            box-shadow: 0 8px 22px rgba(0,0,0,.45), inset 0 1px 0 var(--prism-10);
+            transition:border-color .25s, transform .22s, box-shadow .25s;
+            --provider-accent: var(--blue);
+        }
+        .pcard::before {
+            content:'';
+            position:absolute; left:0; top:0; width:100%; height:100%;
+            background:linear-gradient(145deg, transparent 0%, rgba(255,255,255,.03) 100%);
+            opacity:.9;
+            z-index:0;
+        }
+        .pcard::after {
+            content:'';
+            position:absolute; left:0; top:0; width:5px; height:100%;
+            background:linear-gradient(180deg, var(--provider-accent), rgba(255,255,255,.18));
+            z-index:0;
+            pointer-events:none;
+        }
+        .pcard > * { position:relative; z-index:1; }
+        .pcard:hover { border-color:var(--provider-accent); transform:translateY(-6px); box-shadow:0 26px 60px rgba(0,0,0,.65), 0 0 0 1px var(--provider-accent), inset 0 1px 0 var(--prism-10); }
+
+        .pcard-rank {
+            position:absolute; right:14px; top:12px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:10px; font-weight:700; letter-spacing:.04em;
+            color:var(--text-4);
+        }
+
+        /* Card link wrapper */
+        a.pcard-link { display:block; text-decoration:none; color:inherit; outline:none; border-radius:16px; }
+        a.pcard-link .pcard { cursor:pointer; }
+        a.pcard-link .pcard-visit {
+            display:flex; align-items:center; gap:6px; margin-top:16px; padding-top:14px;
+            border-top:1px solid var(--border-sub);
+            font-size:12px; font-weight:600; color:var(--text-3);
+            transition:color .2s;
+        }
+        a.pcard-link .pcard-visit svg { transition:transform .2s; }
+        a.pcard-link:hover .pcard-visit { color:var(--blue); }
+        a.pcard-link:hover .pcard-visit svg { transform:translateX(3px); }
+        .pcard-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; gap:12px; }
+        .pcard-name { font-size:19px; font-weight:800; color:var(--text-1); letter-spacing:-.02em; word-break:break-word; line-height:1.2; }
+
+        /* Badge */
+        .badge {
+            font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700;
+            letter-spacing:.04em; padding:5px 10px; border-radius:999px;
+            text-transform:uppercase; white-space:nowrap; flex-shrink:0;
+        }
+        .b-tech {
+            background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.08));
+            color:var(--text-1);
+            border:1px solid rgba(255,255,255,.24);
+            text-shadow:0 1px 0 rgba(0,0,0,.25);
+        }
+
+        /* Speed row */
+        .speed-rows { display:flex; flex-direction:column; gap:18px; }
+        .speed-meta { display:block; margin-bottom:10px; }
+        .speed-lbl  { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--text-3); font-family:'JetBrains Mono',monospace; margin-bottom:5px; }
+        .speed-val  { display:block; font-size:30px; font-weight:800; color:var(--text-1); font-family:'JetBrains Mono',monospace; letter-spacing:-.03em; line-height:1; }
+        .speed-unit { font-size:14px; font-weight:500; color:var(--text-2); letter-spacing:0; }
+        .speed-track { height:7px; background:rgba(255,255,255,.08); border-radius:4px; overflow:hidden; }
+        .speed-bar  { height:100%; border-radius:4px; transition:width .8s cubic-bezier(.22,.68,0,1.2); }
+
+        /* Cell card */
+        .ccard-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; gap:10px; }
+        .ccard-net  { font-size:17px; font-weight:700; color:var(--text-1); letter-spacing:-.02em; line-height:1.25; }
+        .ccard-techs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+        .ccard-tech-chip {
+            font-family:'JetBrains Mono',monospace;
+            font-size:11px; font-weight:700;
+            letter-spacing:.04em;
+            padding:4px 9px; border-radius:999px;
+            background:rgba(255,255,255,.06);
+            border:1px solid rgba(255,255,255,.14);
+            color:var(--text-2);
+        }
+        .ccard-tech-chip.tech-5g {
+            background:rgba(139,92,246,.2);
+            border-color:rgba(139,92,246,.35);
+            color:#c4b5fd;
+        }
+        .ccard-tech-chip.tech-4g {
+            background:rgba(6,182,212,.2);
+            border-color:rgba(6,182,212,.35);
+            color:#67e8f9;
+        }
+        .ccard-summary {
+            margin-top:14px; padding-top:12px;
+            border-top:1px solid var(--border-sub);
+            display:flex; justify-content:space-between; gap:8px;
+            font-size:12px; font-weight:600;
+            color:var(--text-2);
+        }
+        .signal-row { display:flex; align-items:center; gap:12px; }
+        .bars       { display:flex; align-items:flex-end; gap:4px; height:26px; }
+        .bar        { width:7px; border-radius:3px; }
+        .sig-label  { font-size:15px; font-weight:700; font-family:'JetBrains Mono',monospace; }
+
+        /* Empty state */
+        .empty-array {
+            grid-column:1/-1; padding:20px 22px;
+            font-size:13px; color:var(--text-2);
+            background:var(--bg-elevated); border:1px solid var(--border-mid);
+            border-radius:10px; font-family:'JetBrains Mono',monospace;
+        }
+
+        /* Grids */
+        .internet-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+        .cell-grid     { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+
+        /* ── Cell CTA ────────────────────────────────────────────── */
+        .cell-cta-wrap {
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            padding:32px 28px; border:1.5px dashed var(--border-mid); border-radius:14px;
+            gap:10px; margin-top:0;
+            background:rgba(255,255,255,.02);
+        }
+        .cell-load-btn {
+            display:inline-flex; align-items:center; gap:10px;
+            background:rgba(139,92,246,.12);
+            border:1.5px solid rgba(139,92,246,.35);
+            color:var(--text-1); padding:15px 26px; border-radius:12px;
+            font-size:15px; font-weight:600; cursor:pointer;
+            transition:border-color .2s, background .2s, transform .15s, box-shadow .2s;
+            font-family:'Inter',sans-serif;
+            box-shadow: 0 4px 20px rgba(139,92,246,.15);
+        }
+        .cell-load-btn:hover  { border-color:var(--purple); background:rgba(139,92,246,.22); transform:translateY(-2px); box-shadow: 0 8px 28px rgba(139,92,246,.25); }
+        .cell-load-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+        .cell-load-btn.loading { pointer-events:none; opacity:.7; }
+        .cell-cta-note { font-size:12px; color:var(--text-3); font-family:'JetBrains Mono',monospace; }
+
+        /* ── Footer ──────────────────────────────────────────────── */
+        .footer {
+            border-top:1px solid var(--border-sub);
+            padding:14px 24px;
+        }
+        .footer-inner {
+            max-width:1200px; margin:0 auto;
+            display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px;
+        }
+        .footer-left  { font-size:11px; color:var(--text-3); }
+        .footer-right { display:flex; gap:20px; align-items:center; }
+        .footer-note  { font-size:11px; color:var(--text-3); font-family:'JetBrains Mono',monospace; }
+        #reset-timer  { font-size:11px; color:var(--text-3); font-family:'JetBrains Mono',monospace; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col selection:bg-indigo-200 selection:text-indigo-900">
+<body>
 
-    <!-- Header / Search Section -->
-    <header class="bg-slate-900 text-slate-100 pt-16 pb-24 px-4 relative overflow-visible border-b border-slate-800">
-        <div class="max-w-4xl mx-auto text-center relative z-10">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-mono text-indigo-400 mb-6">
-                <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                </span>
-                Agent Tooling Interface
+<!-- ── TOP NAV ──────────────────────────────────────────────────── -->
+<nav class="topnav">
+    <div class="topnav-inner">
+        <a class="brand" href="#">
+            <div class="brand-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9"/>
+                    <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>
+                </svg>
             </div>
-            
-            <h1 class="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-white">
-                BroadbandMap API Resolver
-            </h1>
-            <p class="text-slate-400 text-base md:text-lg mb-8 max-w-2xl mx-auto">
-                Geocode string locations to Lat/Lng coordinates and execute <code class="font-mono text-sm bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">GET</code> requests against the Broadband Alpha API.
-            </p>
-            
-            <!-- Custom Autocomplete Search -->
-            <div class="relative w-full max-w-2xl mx-auto text-left" id="search-container">
-                <div class="relative group">
-                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <svg class="h-5 w-5 text-slate-500 group-focus-within:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <span class="brand-name">Broadband<em>Map</em> Resolver</span>
+            <span class="pill-badge mono">v2.0</span>
+        </a>
+
+        <div style="display:flex;align-items:center;gap:18px;">
+            <!-- Rate limit indicator -->
+            <div class="rate-wrap">
+                <span class="rate-label mono">API</span>
+                <div class="rate-track">
+                    <div id="rate-fill" class="rate-fill" style="width:100%;background:var(--green);"></div>
+                </div>
+                <span id="rate-text" class="rate-text mono">60 left</span>
+            </div>
+            <!-- Live indicator -->
+            <div style="display:flex;align-items:center;gap:6px;">
+                <div class="live-dot"></div>
+                <span style="font-size:11px;color:var(--text-3);" class="mono">Live</span>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- ── HERO HEADER ───────────────────────────────────────────────── -->
+<header class="hero">
+    <div class="hero-glow"></div>
+    <div style="position:relative;">
+        <div class="hero-sub-chip mono">
+            <span>&#9632;</span>
+            Agent Tooling Interface &nbsp;·&nbsp; Broadband Alpha API
+        </div>
+
+        <h1 class="hero-title">
+            ISP &amp; Cell Coverage<br>
+            <span class="grad">Lookup Resolver</span>
+        </h1>
+
+        <p class="hero-desc">
+            Geocode any US address via Mapbox, then execute parallel
+            <code>GET</code> requests against the Broadband Alpha API for
+            internet and cellular coverage data.
+        </p>
+
+        <!-- Search -->
+        <div class="search-wrap" id="search-container">
+            <div class="search-input-row">
+                <svg class="search-icon" id="search-icon" width="17" height="17" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input
+                    type="text"
+                    id="address-input"
+                    class="search-input"
+                    placeholder="Enter address, city, or ZIP code..."
+                    autocomplete="off"
+                    spellcheck="false"
+                >
+                <div class="search-right">
+                    <span id="cache-chip" class="cache-chip hidden">CACHED</span>
+                    <div id="input-spinner" class="spinner hidden"></div>
+                </div>
+            </div>
+
+            <!-- Dropdown -->
+            <ul id="suggestions-dropdown" class="dropdown hidden"></ul>
+        </div>
+    </div>
+</header>
+
+<!-- ── MAIN PANEL ────────────────────────────────────────────────── -->
+<main class="main-wrap">
+    <div class="panel">
+        <div class="panel-accent-line"></div>
+
+        <!-- STATE: Initial -->
+        <div id="state-initial" class="state">
+            <div class="state-icon-wrap">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                     style="color:var(--text-3);">
+                    <path d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <p class="state-title">Awaiting Tool Execution</p>
+            <p class="state-desc">Enter a US address above to geocode coordinates and query ISP + cellular coverage from the Broadband Alpha API.</p>
+            <div class="endpoint-chips">
+                <span class="endpoint-chip">GET /api/v1/location/internet</span>
+                <span class="endpoint-chip">GET /api/v1/location/cell</span>
+            </div>
+        </div>
+
+        <!-- STATE: Loading -->
+        <div id="state-loading" class="state hidden">
+            <div class="spinner spinner-lg" style="margin-bottom:24px;"></div>
+            <p class="state-title">Fetching Internet Providers</p>
+            <div class="endpoint-chips" style="margin-top:12px;">
+                <span class="endpoint-chip">&#8594; GET /location/internet</span>
+            </div>
+        </div>
+
+        <!-- STATE: Error -->
+        <div id="state-error" class="state hidden">
+            <div class="state-icon-wrap" style="background:var(--red-dim);border-color:rgba(255,79,114,.3);box-shadow:0 4px 16px rgba(255,79,114,.12);">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none"
+                     stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <p class="state-title">Execution Failed</p>
+            <div id="error-message" class="error-box"></div>
+            <button id="retry-btn" class="retry-btn hidden" onclick="retryLastLookup()">Retry</button>
+        </div>
+
+        <!-- STATE: Results -->
+        <div id="state-results">
+
+            <!-- Context bar -->
+            <div class="ctx-bar">
+                <div class="ctx-left">
+                    <div class="ctx-loc-icon">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                             stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                            <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                     </div>
-                    <input 
-                        type="text" 
-                        id="address-input" 
-                        class="w-full pl-12 pr-4 py-4 rounded-xl border border-slate-700 bg-slate-800 text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-xl text-base outline-none font-mono"
-                        placeholder="Input target address string..."
-                        autocomplete="off"
-                    >
-                    <!-- Loading Spinner for Mapbox -->
-                    <div id="mapbox-loader" class="hidden absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                        <div class="animate-spin rounded-full h-5 w-5 border-2 border-slate-600 border-t-indigo-500"></div>
-                    </div>
-                </div>
-                
-                <!-- Autocomplete Dropdown -->
-                <ul id="suggestions-dropdown" class="hidden absolute z-50 w-full mt-2 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden max-h-72 overflow-y-auto custom-scrollbar">
-                    <!-- Populated by JS -->
-                </ul>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content Area -->
-    <main class="flex-grow w-full max-w-6xl mx-auto px-4 py-12 -mt-10 relative z-0">
-        
-        <!-- UI States Container -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 min-h-[400px] flex flex-col">
-            
-            <!-- 1. Initial State -->
-            <div id="state-initial" class="flex-grow flex flex-col items-center justify-center text-center py-12">
-                <div class="bg-slate-50 p-5 rounded-xl border border-slate-100 mb-4">
-                    <svg class="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                </div>
-                <h2 class="text-lg font-semibold text-slate-700">Awaiting Tool Execution</h2>
-                <p class="text-slate-500 mt-2 max-w-md text-sm">Input a location string to resolve coordinates via Mapbox and execute the tool sequence.</p>
-            </div>
-
-            <!-- 2. Loading State -->
-            <div id="state-loading" class="hidden flex-grow flex flex-col items-center justify-center text-center py-12">
-                <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-slate-100 border-t-indigo-600 mb-6"></div>
-                <h2 class="text-lg font-semibold text-slate-800">Executing API Calls...</h2>
-                <div class="mt-3 flex flex-col gap-1 text-sm font-mono text-slate-500">
-                    <p>GET /api/v1/location/internet</p>
-                    <p>GET /api/v1/location/cell</p>
-                </div>
-            </div>
-
-            <!-- 3. Error State -->
-            <div id="state-error" class="hidden flex-grow flex flex-col items-center justify-center text-center py-12">
-                <div class="bg-red-50 p-5 rounded-xl border border-red-100 mb-4">
-                    <svg class="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                </div>
-                <h2 class="text-lg font-bold text-slate-800 mb-2">API Tool Execution Failed</h2>
-                <p id="error-message" class="text-red-600 text-sm font-mono max-w-lg bg-red-50 border border-red-100 px-4 py-3 rounded-lg"></p>
-            </div>
-
-            <!-- 4. Results State -->
-            <div id="state-results" class="hidden fade-in space-y-10">
-                
-                <!-- Header for Results & Context -->
-                <div class="border-b border-slate-100 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border">
                     <div>
-                        <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Resolved Context</h2>
-                        <p id="result-address-label" class="text-slate-800 font-medium"></p>
-                    </div>
-                    <div class="flex gap-4">
-                        <div class="bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
-                            <span class="text-xs text-slate-400 block uppercase tracking-wider font-bold">Latitude</span>
-                            <span id="label-lat" class="font-mono text-sm text-slate-700"></span>
-                        </div>
-                        <div class="bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
-                            <span class="text-xs text-slate-400 block uppercase tracking-wider font-bold">Longitude</span>
-                            <span id="label-lng" class="font-mono text-sm text-slate-700"></span>
-                        </div>
+                        <div class="ctx-sublabel">Resolved Location</div>
+                        <div id="result-address" class="ctx-address"></div>
                     </div>
                 </div>
-
-                <!-- Internet Providers Section -->
-                <section>
-                    <div class="flex items-center gap-2 mb-6">
-                        <div class="bg-slate-800 text-white p-1.5 rounded-lg">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-slate-800">Internet Providers</h3>
-                            <p class="text-xs font-mono text-slate-500">Response Data Array | Sorted by bandwidth</p>
-                        </div>
+                <div class="ctx-right">
+                    <span id="cached-result-badge" class="cached-badge-result hidden">FROM CACHE</span>
+                    <div class="coord-chip">
+                        <div class="ctx-sublabel">Latitude</div>
+                        <div id="label-lat" class="coord-val"></div>
                     </div>
-                    
-                    <div id="internet-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <!-- Internet Cards Injected Here -->
+                    <div class="coord-chip">
+                        <div class="ctx-sublabel">Longitude</div>
+                        <div id="label-lng" class="coord-val"></div>
                     </div>
-                </section>
-
-                <!-- Cell Coverage Section -->
-                <section>
-                    <div class="flex items-center gap-2 mb-6">
-                        <div class="bg-slate-800 text-white p-1.5 rounded-lg">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-slate-800">Cellular Signal Coverage</h3>
-                            <p class="text-xs font-mono text-slate-500">Response Data Array | Aggregated by H3 hex</p>
-                        </div>
-                    </div>
-
-                    <div id="cell-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <!-- Cell Cards Injected Here -->
-                    </div>
-                </section>
-
+                    <button class="icon-btn" id="copy-btn" onclick="copyCoords()" title="Copy coordinates">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2"/>
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
+
+            <!-- Internet section -->
+            <section style="margin-bottom:40px;">
+                <div class="section-head">
+                    <div class="section-icon">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                             stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="9"/>
+                            <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="section-title">Internet Providers</div>
+                        <div class="section-sub mono">Sorted by max download bandwidth</div>
+                    </div>
+                    <div class="section-rule"></div>
+                    <span id="internet-count" class="section-count"></span>
+                </div>
+                <div id="internet-grid" class="internet-grid"></div>
+            </section>
+
+            <!-- Cell CTA – shown after internet loads -->
+            <div id="cell-cta" class="hidden">
+                <div class="cell-cta-wrap">
+                    <button id="cell-load-btn" class="cell-load-btn" onclick="loadCellCoverage()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                             stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="5" y="2" width="14" height="20" rx="2"/>
+                            <line x1="12" y1="18" x2="12.01" y2="18"/>
+                        </svg>
+                        <span id="cell-btn-label">Load Cell Coverage</span>
+                        <div id="cell-btn-spinner" class="spinner hidden" style="width:14px;height:14px;border-width:1.5px;"></div>
+                    </button>
+                    <span class="cell-cta-note">+1 API call &nbsp;·&nbsp; uses 1 of your 60 req/hr budget</span>
+                </div>
+            </div>
+
+            <!-- Cell section – revealed after fetch -->
+            <div id="cell-section" class="hidden">
+                <section>
+                    <div class="section-head">
+                        <div class="section-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                                 stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="5" y="2" width="14" height="20" rx="2"/>
+                                <line x1="12" y1="18" x2="12.01" y2="18"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="section-title">Cellular Coverage</div>
+                            <div class="section-sub mono">Merged by carrier · 4G/5G grouped in one card</div>
+                        </div>
+                        <div class="section-rule"></div>
+                        <span id="cell-count" class="section-count"></span>
+                    </div>
+                    <div id="cell-grid" class="cell-grid"></div>
+                </section>
+            </div>
+
+        </div><!-- /state-results -->
+    </div><!-- /panel -->
+</main>
+
+<!-- ── FOOTER ────────────────────────────────────────────────────── -->
+<footer class="footer">
+    <div class="footer-inner">
+        <span class="footer-left mono">BroadbandMap Resolver &nbsp;·&nbsp; Agent Tooling v2.0</span>
+        <div class="footer-right">
+            <span class="footer-note">60 req/hr limit &nbsp;·&nbsp; 1 call for internet &nbsp;·&nbsp; +1 optional for cell</span>
+            <span id="reset-timer">Resets in —</span>
         </div>
-    </main>
+    </div>
+</footer>
 
-    <script>
-        // System Config
-        const MAPBOX_TOKEN = 'pk.eyJ1Ijoic3RhbmNlLW1hcmtldGluZyIsImEiOiJjbW44MjFla2UwNnNyMm9va2U5YnR3OXY3In0.7ZnJGh1XAcyt6FRa35XQTA';
-        const BROADBAND_API_BASE = 'https://broadbandmap.com/api/v1/location';
+<!-- ── SCRIPTS ───────────────────────────────────────────────────── -->
+<script>
+'use strict';
 
-        // DOM Elements
-        const elInput = document.getElementById('address-input');
-        const elDropdown = document.getElementById('suggestions-dropdown');
-        const elMapboxLoader = document.getElementById('mapbox-loader');
-        
-        const elStateInit = document.getElementById('state-initial');
-        const elStateLoad = document.getElementById('state-loading');
-        const elStateErr = document.getElementById('state-error');
-        const elStateRes = document.getElementById('state-results');
-        
-        const elErrMsg = document.getElementById('error-message');
-        const elAddressLabel = document.getElementById('result-address-label');
-        const elLabelLat = document.getElementById('label-lat');
-        const elLabelLng = document.getElementById('label-lng');
-        
-        const elInternetGrid = document.getElementById('internet-grid');
-        const elCellGrid = document.getElementById('cell-grid');
+// ─── Config ───────────────────────────────────────────────────────
+const MAPBOX_TOKEN    = 'pk.eyJ1Ijoic3RhbmNlLW1hcmtldGluZyIsImEiOiJjbW44MjFla2UwNnNyMm9va2U5YnR3OXY3In0.7ZnJGh1XAcyt6FRa35XQTA';
+const BROADBAND_BASE  = 'https://broadbandmap.com/api/v1/location';
+const HOURLY_LIMIT    = 60;
+const CALLS_PER_LOOKUP = 1;  // 1 for internet; +1 optional for cell on demand
+const RL_KEY          = 'bbmap_rl_v2';
+const COORD_DP        = 4;   // decimal places for cache key (~11m precision)
 
-        let debounceTimer;
+// ─── Rate Limiter ─────────────────────────────────────────────────
+const RateLimiter = {
+    _load() {
+        try {
+            const d = JSON.parse(localStorage.getItem(RL_KEY));
+            if (d && typeof d.used === 'number' && d.resetAt > Date.now()) return d;
+        } catch (_) {}
+        return this._fresh();
+    },
+    _fresh() { return { used: 0, resetAt: Date.now() + 3_600_000 }; },
+    _save(s)  { try { localStorage.setItem(RL_KEY, JSON.stringify(s)); } catch (_) {} },
+    get remaining() {
+        const s = this._load();
+        // Auto-reset if window has passed
+        if (s.resetAt <= Date.now()) { this._save(this._fresh()); return HOURLY_LIMIT; }
+        return Math.max(0, HOURLY_LIMIT - s.used);
+    },
+    get resetAt() { return this._load().resetAt; },
+    canConsume(n = CALLS_PER_LOOKUP) { return this.remaining >= n; },
+    consume(n = CALLS_PER_LOOKUP) {
+        const s = this._load();
+        s.used = Math.min(HOURLY_LIMIT, s.used + n);
+        this._save(s);
+        updateRateUI();
+    }
+};
 
-        // 1. Handle Mapbox Autocomplete Input
-        elInput.addEventListener('input', (e) => {
-            clearTimeout(debounceTimer);
-            const query = e.target.value.trim();
+// ─── Results Cache ────────────────────────────────────────────────
+// Stores internet and cell independently so internet can be cached
+// before the user optionally fetches cell coverage.
+const Cache = {
+    _store: {},
+    _key(lat, lng) {
+        return `${parseFloat(lat).toFixed(COORD_DP)},${parseFloat(lng).toFixed(COORD_DP)}`;
+    },
+    _entry(lat, lng)            { return this._store[this._key(lat, lng)] || null; },
+    hasInternet(lat, lng)       { return !!(this._entry(lat, lng)?.internet); },
+    hasCell(lat, lng)           { return !!(this._entry(lat, lng)?.cell); },
+    getInternet(lat, lng)       { return this._entry(lat, lng)?.internet ?? null; },
+    getCell(lat, lng)           { return this._entry(lat, lng)?.cell    ?? null; },
+    setInternet(lat, lng, data) {
+        const k = this._key(lat, lng);
+        this._store[k] = { ...(this._store[k] || {}), internet: data };
+    },
+    setCell(lat, lng, data) {
+        const k = this._key(lat, lng);
+        this._store[k] = { ...(this._store[k] || {}), cell: data };
+    }
+};
 
-            if (query.length < 3) {
-                elDropdown.classList.add('hidden');
-                elMapboxLoader.classList.add('hidden');
-                return;
-            }
+// ─── DOM refs ─────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
 
-            elMapboxLoader.classList.remove('hidden');
+const elInput           = $('address-input');
+const elDropdown        = $('suggestions-dropdown');
+const elInputSpinner    = $('input-spinner');
+const elCacheChip       = $('cache-chip');
+const elStateInitial    = $('state-initial');
+const elStateLoading    = $('state-loading');
+const elStateError      = $('state-error');
+const elStateResults    = $('state-results');
+const elErrorMsg        = $('error-message');
+const elRetryBtn        = $('retry-btn');
+const elResultAddress   = $('result-address');
+const elLabelLat        = $('label-lat');
+const elLabelLng        = $('label-lng');
+const elCachedBadge     = $('cached-result-badge');
+const elInternetGrid    = $('internet-grid');
+const elCellGrid        = $('cell-grid');
+const elInternetCount   = $('internet-count');
+const elCellCount       = $('cell-count');
+const elCellCta         = $('cell-cta');
+const elCellSection     = $('cell-section');
 
-            // Debounce the geocoding to prevent rapid-fire keystroke API calls
-            debounceTimer = setTimeout(() => {
-                fetchMapboxSuggestions(query);
-            }, 300);
+let debounceTimer = null;
+let pendingLat    = null;
+let pendingLng    = null;
+
+// ─── State machine ────────────────────────────────────────────────
+function showState(name) {
+    elStateInitial.classList.add('hidden');
+    elStateLoading.classList.add('hidden');
+    elStateError.classList.add('hidden');
+    elStateResults.classList.remove('visible');
+    elStateResults.style.display = 'none';
+
+    if (name === 'initial')  elStateInitial.classList.remove('hidden');
+    if (name === 'loading')  elStateLoading.classList.remove('hidden');
+    if (name === 'error')    elStateError.classList.remove('hidden');
+    if (name === 'results') {
+        elStateResults.style.display = 'block';
+        elStateResults.classList.add('visible', 'anim-fade-up');
+    }
+}
+
+// ─── XSS-safe text setter ─────────────────────────────────────────
+function setText(el, val) {
+    if (el) el.textContent = String(val ?? '');
+}
+
+// ─── Rate limit UI ────────────────────────────────────────────────
+function updateRateUI() {
+    const rem  = RateLimiter.remaining;
+    const pct  = (rem / HOURLY_LIMIT) * 100;
+    const fill = $('rate-fill');
+    const text = $('rate-text');
+    if (fill) {
+        fill.style.width      = pct + '%';
+        fill.style.background = rem > 20 ? 'var(--green)' : rem > 8 ? 'var(--amber)' : 'var(--red)';
+    }
+    if (text) setText(text, rem + ' left');
+}
+
+function updateResetTimer() {
+    const el   = $('reset-timer');
+    if (!el) return;
+    const diff = RateLimiter.resetAt - Date.now();
+    if (diff <= 0) { setText(el, 'Resets in —'); updateRateUI(); return; }
+    const m = Math.floor(diff / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    setText(el, `Resets in ${m}m ${s < 10 ? '0' : ''}${s}s`);
+}
+
+setInterval(updateResetTimer, 1000);
+updateRateUI();
+updateResetTimer();
+
+// ─── Copy coords ──────────────────────────────────────────────────
+function copyCoords() {
+    const text = `${elLabelLat.textContent}, ${elLabelLng.textContent}`;
+    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+    const btn = $('copy-btn');
+    if (!btn) return;
+    btn.style.borderColor = 'rgba(13,206,116,.4)';
+    btn.style.color       = 'var(--green)';
+    setTimeout(() => { btn.style.borderColor = ''; btn.style.color = ''; }, 1600);
+}
+
+function retryLastLookup() {
+    if (pendingLat !== null && pendingLng !== null)
+        executeAgentTool(pendingLat, pendingLng, false);
+}
+
+// ─── Mapbox autocomplete ──────────────────────────────────────────
+elInput.addEventListener('input', e => {
+    clearTimeout(debounceTimer);
+    const q = e.target.value.trim();
+    elCacheChip.classList.add('hidden');
+    if (q.length < 3) {
+        elDropdown.classList.add('hidden');
+        elInputSpinner.classList.add('hidden');
+        return;
+    }
+    elInputSpinner.classList.remove('hidden');
+    // Debounce: 350 ms prevents rapid-fire geocoding calls
+    debounceTimer = setTimeout(() => fetchSuggestions(q), 350);
+});
+
+document.addEventListener('click', e => {
+    if (!$('search-container').contains(e.target))
+        elDropdown.classList.add('hidden');
+});
+
+async function fetchSuggestions(query) {
+    try {
+        const url = [
+            'https://api.mapbox.com/geocoding/v5/mapbox.places/',
+            encodeURIComponent(query),
+            '.json?access_token=', MAPBOX_TOKEN,
+            '&types=address,place&country=us&autocomplete=true&limit=5'
+        ].join('');
+        const res  = await fetch(url);
+        if (!res.ok) throw new Error('Geocoding HTTP ' + res.status);
+        const data = await res.json();
+        renderDropdown(data.features || []);
+    } catch (err) {
+        console.error('Geocoding error:', err);
+        elDropdown.classList.add('hidden');
+    } finally {
+        elInputSpinner.classList.add('hidden');
+    }
+}
+
+function renderDropdown(features) {
+    elDropdown.innerHTML = '';
+
+    if (features.length === 0) {
+        const li    = document.createElement('li');
+        li.className = 'dd-item';
+        const msg   = document.createElement('span');
+        msg.className = 'dd-secondary mono';
+        setText(msg, '0 results returned for this query');
+        li.appendChild(msg);
+        elDropdown.appendChild(li);
+        elDropdown.classList.remove('hidden');
+        return;
+    }
+
+    features.forEach(feature => {
+        const placeName = feature.place_name || '';
+        const parts     = placeName.split(',');
+        const primary   = parts[0] || '';
+        const secondary = parts.slice(1).join(',').trim();
+
+        const li   = document.createElement('li');
+        li.className = 'dd-item';
+
+        const p1 = document.createElement('span');
+        p1.className = 'dd-primary';
+        setText(p1, primary);
+
+        const p2 = document.createElement('span');
+        p2.className = 'dd-secondary';
+        setText(p2, secondary);
+
+        li.appendChild(p1);
+        li.appendChild(p2);
+
+        li.addEventListener('click', () => {
+            const [lng, lat] = feature.geometry.coordinates;
+            elInput.value = primary;
+            setText(elResultAddress, placeName);
+            elLabelLat.textContent = parseFloat(lat).toFixed(5);
+            elLabelLng.textContent = parseFloat(lng).toFixed(5);
+            elDropdown.classList.add('hidden');
+
+            if (Cache.hasInternet(lat, lng)) elCacheChip.classList.remove('hidden');
+            else                             elCacheChip.classList.add('hidden');
+
+            executeAgentTool(lat, lng);
         });
 
-        // Hide dropdown on outside click
-        document.addEventListener('click', (e) => {
-            if (!document.getElementById('search-container').contains(e.target)) {
-                elDropdown.classList.add('hidden');
-            }
-        });
+        elDropdown.appendChild(li);
+    });
 
-        // 2. Fetch Mapbox Suggestions
-        async function fetchMapboxSuggestions(query) {
-            try {
-                const response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&types=address&country=us&autocomplete=true&limit=5`);
-                const data = await response.json();
-                
-                elMapboxLoader.classList.add('hidden');
-                renderDropdown(data.features || []);
-            } catch (err) {
-                console.error("Geocoding Error:", err);
-                elMapboxLoader.classList.add('hidden');
-            }
+    elDropdown.classList.remove('hidden');
+}
+
+// ─── Broadband API execution ──────────────────────────────────────
+function showCellButton() {
+    elCellCta.classList.remove('hidden');
+    elCellSection.classList.add('hidden');
+}
+
+async function executeAgentTool(lat, lng, checkCache = true) {
+    pendingLat = lat;
+    pendingLng = lng;
+    elRetryBtn.classList.add('hidden');
+
+    // Reset cell area for each new lookup
+    elCellCta.classList.add('hidden');
+    elCellSection.classList.add('hidden');
+    elCellGrid.innerHTML = '';
+
+    // 1. Serve internet from cache – zero API calls consumed
+    if (checkCache && Cache.hasInternet(lat, lng)) {
+        renderInternetResults(Cache.getInternet(lat, lng), true);
+        if (Cache.hasCell(lat, lng)) {
+            renderCellResults(Cache.getCell(lat, lng), true);
+        } else {
+            showCellButton();
         }
+        return;
+    }
 
-        // 3. Render Dropdown
-        function renderDropdown(features) {
-            elDropdown.innerHTML = '';
-            
-            if (features.length === 0) {
-                elDropdown.innerHTML = `<li class="px-4 py-3 text-sm font-mono text-slate-400">0 results returned.</li>`;
-                elDropdown.classList.remove('hidden');
-                return;
+    // 2. Guard: check remaining budget BEFORE any fetch
+    if (!RateLimiter.canConsume(1)) {
+        const minsLeft = Math.ceil((RateLimiter.resetAt - Date.now()) / 60000);
+        setText(elErrorMsg, `Rate limit reached (${HOURLY_LIMIT} req/hr). Resets in ~${minsLeft} min.`);
+        showState('error');
+        return;
+    }
+
+    showState('loading');
+
+    try {
+        // 3. Consume 1 call for internet only
+        RateLimiter.consume(1);
+        const internetRes = await fetch(`${BROADBAND_BASE}/internet?lat=${lat}&lng=${lng}`);
+        if (internetRes.status === 429) throw new Error('HTTP 429: Server-side rate limit exceeded. Please wait before retrying.');
+        if (!internetRes.ok) throw new Error(`HTTP ${internetRes.status} on /internet endpoint.`);
+        const internet = await internetRes.json();
+        Cache.setInternet(lat, lng, internet);
+        renderInternetResults(internet, false);
+        showCellButton();
+    } catch (err) {
+        setText(elErrorMsg, err.message || 'Unknown network error');
+        elRetryBtn.classList.remove('hidden');
+        showState('error');
+    }
+}
+
+// ─── Load cell coverage (on demand) ──────────────────────────────
+async function loadCellCoverage() {
+    if (pendingLat === null || pendingLng === null) return;
+    const lat = pendingLat;
+    const lng = pendingLng;
+
+    // Serve from cache if already fetched
+    if (Cache.hasCell(lat, lng)) {
+        renderCellResults(Cache.getCell(lat, lng), true);
+        return;
+    }
+
+    // Budget check
+    if (!RateLimiter.canConsume(1)) {
+        const minsLeft = Math.ceil((RateLimiter.resetAt - Date.now()) / 60000);
+        setText(elErrorMsg, `Rate limit reached (${HOURLY_LIMIT} req/hr). Resets in ~${minsLeft} min.`);
+        showState('error');
+        return;
+    }
+
+    const btn     = $('cell-load-btn');
+    const spinner = $('cell-btn-spinner');
+    const label   = $('cell-btn-label');
+    if (btn)     btn.disabled = true;
+    if (spinner) spinner.classList.remove('hidden');
+    if (label)   setText(label, 'Loading\u2026');
+
+    try {
+        RateLimiter.consume(1);
+        const cellRes = await fetch(`${BROADBAND_BASE}/cell?lat=${lat}&lng=${lng}`);
+        if (cellRes.status === 429) throw new Error('HTTP 429: Server-side rate limit exceeded.');
+        if (!cellRes.ok) throw new Error(`HTTP ${cellRes.status} on /cell endpoint.`);
+        const cell = await cellRes.json();
+        Cache.setCell(lat, lng, cell);
+        renderCellResults(cell, false);
+    } catch (err) {
+        if (btn)     btn.disabled = false;
+        if (spinner) spinner.classList.add('hidden');
+        if (label)   setText(label, 'Load Cell Coverage');
+        setText(elErrorMsg, err.message || 'Unknown network error');
+        elRetryBtn.classList.remove('hidden');
+        showState('error');
+    }
+}
+
+// ─── Render internet results ──────────────────────────────────────
+// API response: { providers: [ { name, technology, max_download_mbps, max_upload_mbps } ] }
+// ─── Provider homepage lookup ─────────────────────────────────────
+const PROVIDER_URLS = {
+    'at&t':          'https://www.att.com',
+    'att':           'https://www.att.com',
+    'verizon':       'https://www.verizon.com',
+    'comcast':       'https://www.xfinity.com',
+    'xfinity':       'https://www.xfinity.com',
+    'spectrum':      'https://www.spectrum.com',
+    'charter':       'https://www.spectrum.com',
+    'cox':           'https://www.cox.com',
+    'centurylink':   'https://www.centurylink.com',
+    'lumen':         'https://www.lumen.com',
+    'frontier':      'https://www.frontier.com',
+    'windstream':    'https://www.windstream.com',
+    'mediacom':      'https://www.mediacomcable.com',
+    'optimum':       'https://www.optimum.com',
+    'altice':        'https://www.optimum.com',
+    'suddenlink':    'https://www.optimum.com',
+    'wow':           'https://www.wowway.com',
+    'google fiber':  'https://fiber.google.com',
+    'google':        'https://fiber.google.com',
+    'sonic':         'https://www.sonic.com',
+    'ziply':         'https://www.ziplyfiber.com',
+    'ziply fiber':   'https://www.ziplyfiber.com',
+    'earthlink':     'https://www.earthlink.net',
+    'hughesnet':     'https://www.hughesnet.com',
+    'viasat':        'https://www.viasat.com',
+    'starlink':      'https://www.starlink.com',
+    'spacex':        'https://www.starlink.com',
+    'tmobile':       'https://www.t-mobile.com',
+    't-mobile':      'https://www.t-mobile.com',
+    'astound':       'https://www.astound.com',
+    'rcn':           'https://www.astound.com',
+    'grande':        'https://www.astound.com',
+    'consolidated':  'https://www.consolidated.com',
+    'cincinnati bell':'https://www.altafiber.com',
+    'altafiber':     'https://www.altafiber.com',
+    'metronet':      'https://www.metronet.com',
+    'epb':           'https://epb.com',
+    'allo':          'https://www.allocommunications.com',
+    'fidium':        'https://www.fidiumfiber.com',
+    'breezeline':    'https://www.breezeline.com',
+    'sparklight':    'https://www.sparklight.com',
+    'cable one':     'https://www.sparklight.com',
+    'rise broadband':'https://www.risebroadband.com',
+    'c spire':       'https://www.cspire.com',
+    'us cellular':   'https://www.uscellular.com',
+    'dish':          'https://www.dish.com',
+    'boost':         'https://www.boostmobile.com',
+    'cricket':       'https://www.cricketwireless.com',
+    'mint mobile':   'https://www.mintmobile.com',
+};
+
+function getProviderUrl(name) {
+    const n = String(name).toLowerCase().trim();
+    // Exact match first
+    if (PROVIDER_URLS[n]) return PROVIDER_URLS[n];
+    // Partial match — check if any known key is contained in the provider name
+    for (const [key, url] of Object.entries(PROVIDER_URLS)) {
+        if (n.includes(key) || key.includes(n)) return url;
+    }
+    // Fallback: Google search for the provider
+    return `https://www.google.com/search?q=${encodeURIComponent(name + ' internet provider')}`;
+}
+
+function getProviderAccent(name) {
+    const palette = [
+        '#6366f1', // indigo
+        '#06b6d4', // cyan
+        '#8b5cf6', // violet
+        '#f59e0b', // amber
+        '#10b981', // emerald
+        '#f43f5e', // rose
+        '#3b82f6', // blue
+        '#a855f7', // purple
+        '#14b8a6', // teal
+        '#f97316', // orange
+    ];
+    const s = String(name || '').toLowerCase().trim();
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
+    return palette[Math.abs(hash) % palette.length];
+}
+
+function renderInternetResults(internetResponse, fromCache) {
+    const internetList = Array.isArray(internetResponse)
+        ? internetResponse : (internetResponse?.providers ?? []);
+
+    elCachedBadge.classList.toggle('hidden', !fromCache);
+    elCacheChip.classList.toggle('hidden',   !fromCache);
+
+    elInternetGrid.innerHTML = '';
+
+    if (internetList.length === 0) {
+        const d = document.createElement('div');
+        d.className = 'empty-array';
+        setText(d, '[] // No providers found at this location');
+        elInternetGrid.appendChild(d);
+    } else {
+        const providers = internetList
+            .map(p => ({
+                name: String(p.name || 'Unknown Provider'),
+                tech: String(p.technology || 'Unknown'),
+                down: parseFloat(p.max_download_mbps || 0),
+                up:   parseFloat(p.max_upload_mbps   || 0)
+            }))
+            .sort((a, b) => b.down - a.down);
+
+        setText(elInternetCount, `${providers.length} provider${providers.length !== 1 ? 's' : ''}`);
+
+        providers.forEach((p, idx) => {
+            const url = getProviderUrl(p.name);
+            const link = document.createElement('a');
+            link.className = 'pcard-link';
+            link.href = url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+
+            const card = document.createElement('div');
+            card.className = 'pcard';
+            card.style.setProperty('--provider-accent', getProviderAccent(p.name));
+
+            const rank = document.createElement('span');
+            rank.className = 'pcard-rank';
+            setText(rank, `#${idx + 1}`);
+
+            const head  = document.createElement('div'); head.className = 'pcard-head';
+            const name  = document.createElement('span'); name.className = 'pcard-name'; setText(name, p.name);
+            const badge = document.createElement('span'); badge.className = 'badge b-tech'; setText(badge, p.tech);
+            head.appendChild(name); head.appendChild(badge);
+
+            const speeds = document.createElement('div'); speeds.className = 'speed-rows';
+            speeds.appendChild(buildSpeedRow('DL', p.down, techBarColor(p.tech)));
+            speeds.appendChild(buildSpeedRow('UL', p.up,   techBarColor(p.tech)));
+
+            // Visit provider footer
+            const visit = document.createElement('div'); visit.className = 'pcard-visit';
+            const visitText = document.createElement('span'); setText(visitText, 'Visit provider');
+            const visitIcon = document.createElementNS('http://www.w3.org/2000/svg','svg');
+            visitIcon.setAttribute('width','14'); visitIcon.setAttribute('height','14');
+            visitIcon.setAttribute('viewBox','0 0 24 24'); visitIcon.setAttribute('fill','none');
+            visitIcon.setAttribute('stroke','currentColor'); visitIcon.setAttribute('stroke-width','2');
+            visitIcon.setAttribute('stroke-linecap','round'); visitIcon.setAttribute('stroke-linejoin','round');
+            visitIcon.innerHTML = '<path d="M7 17L17 7"/><path d="M7 7h10v10"/>';
+            visit.appendChild(visitText); visit.appendChild(visitIcon);
+
+            card.appendChild(rank);
+            card.appendChild(head);
+            card.appendChild(speeds);
+            card.appendChild(visit);
+            link.appendChild(card);
+            elInternetGrid.appendChild(link);
+        });
+    }
+
+    showState('results');
+}
+
+// ─── Render cell results ──────────────────────────────────────────
+// API response: { coverage: [ { network, technology, rsrp_dbm, signal_level } ] }
+function renderCellResults(cellResponse, fromCache) {
+    const cellList = Array.isArray(cellResponse)
+        ? cellResponse : (cellResponse?.coverage ?? []);
+
+    elCellCta.classList.add('hidden');
+    elCellSection.classList.remove('hidden');
+    elCellSection.classList.add('anim-fade-up');
+
+    elCellGrid.innerHTML = '';
+
+    if (cellList.length === 0) {
+        const d = document.createElement('div');
+        d.className = 'empty-array';
+        setText(d, '[] // No cell coverage data at this location');
+        elCellGrid.appendChild(d);
+    } else {
+        const levelRank = { excellent: 5, strong: 4, good: 3, fair: 2, weak: 1, unknown: 0 };
+        const byNetwork = new Map();
+
+        cellList.forEach(n => {
+            const network = String(n.network || 'Unknown').trim();
+            const tech = String(n.technology || '').toUpperCase().trim() || 'UNKNOWN';
+            const level = String(n.signal_level || 'Unknown').trim();
+            const dbm = n.rsrp_dbm != null ? Number(n.rsrp_dbm) : null;
+
+            if (!byNetwork.has(network)) {
+                byNetwork.set(network, {
+                    network,
+                    techs: new Set(),
+                    levels: [],
+                    dbmValues: []
+                });
             }
 
-            features.forEach(feature => {
-                const li = document.createElement('li');
-                li.className = "px-4 py-3 hover:bg-slate-700 cursor-pointer border-b border-slate-700 last:border-0 transition-colors flex flex-col text-left";
-                
-                const placeName = feature.place_name;
-                const [primary, ...rest] = placeName.split(',');
-                const secondary = rest.join(',').trim();
+            const item = byNetwork.get(network);
+            item.techs.add(tech);
+            item.levels.push(level);
+            if (dbm != null && Number.isFinite(dbm)) item.dbmValues.push(dbm);
+        });
 
-                li.innerHTML = `
-                    <span class="block font-medium text-slate-100 text-sm">${primary}</span>
-                    <span class="block text-slate-400 text-xs mt-0.5">${secondary}</span>
-                `;
+        const carriers = Array.from(byNetwork.values())
+            .map(c => {
+                const bestLevel = c.levels
+                    .slice()
+                    .sort((a, b) => {
+                        const ra = levelRank[String(a).toLowerCase()] ?? 0;
+                        const rb = levelRank[String(b).toLowerCase()] ?? 0;
+                        return rb - ra;
+                    })[0] || 'Unknown';
 
-                li.addEventListener('click', () => {
-                    const [lng, lat] = feature.geometry.coordinates;
-                    elInput.value = primary; 
-                    
-                    // Populate Context Banner
-                    elAddressLabel.textContent = placeName;
-                    elLabelLat.textContent = lat.toFixed(5);
-                    elLabelLng.textContent = lng.toFixed(5);
-                    
-                    elDropdown.classList.add('hidden');
-                    
-                    // Trigger Broadband Execution
-                    executeAgentTool(lat, lng);
-                });
+                const bestDbm = c.dbmValues.length ? Math.max(...c.dbmValues) : null;
 
-                elDropdown.appendChild(li);
+                return {
+                    network: c.network,
+                    techs: Array.from(c.techs).sort((a, b) => b.localeCompare(a)),
+                    level: bestLevel,
+                    dbm: bestDbm != null ? `${bestDbm.toFixed(1)} dBm` : null
+                };
+            })
+            .sort((a, b) => a.network.localeCompare(b.network));
+
+        setText(elCellCount, `${carriers.length} carrier${carriers.length !== 1 ? 's' : ''}`);
+
+        carriers.forEach(c => {
+            const sig  = signalProps(c.level);
+            const url = getProviderUrl(c.network);
+            const link = document.createElement('a');
+            link.className = 'pcard-link';
+            link.href = url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+
+            const card = document.createElement('div');
+            card.className = 'pcard';
+            card.style.setProperty('--provider-accent', getProviderAccent(c.network));
+
+            const head    = document.createElement('div'); head.className = 'ccard-head';
+            const netName = document.createElement('span'); netName.className = 'ccard-net';
+            setText(netName, c.network);
+            const summaryBadge   = document.createElement('span'); summaryBadge.className = 'badge b-tech';
+            setText(summaryBadge, 'CELL');
+            head.appendChild(netName); head.appendChild(summaryBadge);
+
+            const techRow = document.createElement('div'); techRow.className = 'ccard-techs';
+            c.techs.forEach(t => {
+                const chip = document.createElement('span');
+                chip.className = 'ccard-tech-chip';
+                if (t.includes('5G')) chip.classList.add('tech-5g');
+                else if (t.includes('4G')) chip.classList.add('tech-4g');
+                setText(chip, t);
+                techRow.appendChild(chip);
             });
 
-            elDropdown.classList.remove('hidden');
-        }
-
-        // 4. Execute Broadband API Tool Lookups
-        async function executeAgentTool(lat, lng) {
-            switchUIState('loading');
-
-            try {
-                const [internetRes, cellRes] = await Promise.all([
-                    fetch(`${BROADBAND_API_BASE}/internet?lat=${lat}&lng=${lng}`),
-                    fetch(`${BROADBAND_API_BASE}/cell?lat=${lat}&lng=${lng}`)
-                ]);
-
-                if (internetRes.status === 429 || cellRes.status === 429) {
-                    throw new Error("HTTP 429 Too Many Requests: Broadband Alpha API rate limit (60 req/hr) exceeded.");
-                }
-                if (!internetRes.ok || !cellRes.ok) {
-                    throw new Error(`HTTP Error: Unexpected API response from endpoints.`);
-                }
-
-                const internetData = await internetRes.json();
-                const cellData = await cellRes.json();
-
-                renderResults(internetData, cellData);
-            } catch (err) {
-                elErrMsg.textContent = err.message;
-                switchUIState('error');
-            }
-        }
-
-        // 5. Render Data Arrays
-        function renderResults(internetResponse, cellResponse) {
-            const internetList = Array.isArray(internetResponse) ? internetResponse : (internetResponse.data || []);
-            const cellList = Array.isArray(cellResponse) ? cellResponse : (cellResponse.data || []);
-
-            // Internet Array
-            elInternetGrid.innerHTML = '';
-            if (internetList.length === 0) {
-                elInternetGrid.innerHTML = `<div class="col-span-full p-4 font-mono text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded">[] // Empty Response Array</div>`;
-            } else {
-                const sortedInternet = internetList.map(p => ({
-                    name: p.name || p.provider || 'Unknown',
-                    tech: p.technology || p.tech || 'Unknown',
-                    down: parseFloat(p.max_download || p.download || 0),
-                    up: parseFloat(p.max_upload || p.upload || 0)
-                })).sort((a, b) => b.down - a.down);
-
-                sortedInternet.forEach(provider => {
-                    const techColor = getTechStyle(provider.tech);
-                    elInternetGrid.innerHTML += `
-                        <div class="border border-slate-200 rounded-lg p-4 bg-white">
-                            <div class="flex justify-between items-start mb-3">
-                                <h4 class="font-bold text-slate-800 text-sm">${provider.name}</h4>
-                                <span class="${techColor} font-mono text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">${provider.tech}</span>
-                            </div>
-                            <div class="flex gap-4">
-                                <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">DL</p>
-                                    <p class="font-mono font-bold text-slate-800 text-sm">${provider.down} <span class="text-xs font-normal text-slate-500">Mbps</span></p>
-                                </div>
-                                <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">UL</p>
-                                    <p class="font-mono font-bold text-slate-800 text-sm">${provider.up} <span class="text-xs font-normal text-slate-500">Mbps</span></p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-
-            // Cell Array
-            elCellGrid.innerHTML = '';
-            if (cellList.length === 0) {
-                elCellGrid.innerHTML = `<div class="col-span-full p-4 font-mono text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded">[] // Empty Response Array</div>`;
-            } else {
-                const sortedCell = cellList.map(n => ({
-                    network: n.network || 'Unknown',
-                    tech: (n.technology || n.tech || '').toUpperCase(),
-                    level: n.signal_level || 'Unknown'
-                })).sort((a, b) => a.network.localeCompare(b.network) || b.tech.localeCompare(a.tech));
-
-                sortedCell.forEach(net => {
-                    const sigProps = getSignalBars(net.level);
-                    elCellGrid.innerHTML += `
-                        <div class="border border-slate-200 rounded-lg p-3 bg-white flex flex-col justify-between">
-                            <div class="flex items-center justify-between mb-3">
-                                <h4 class="font-bold text-slate-800 capitalize text-sm">${net.network.replace('-', ' ')}</h4>
-                                <span class="bg-slate-100 text-slate-600 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border border-slate-200">${net.tech}</span>
-                            </div>
-                            <div class="flex items-center gap-2 mt-auto">
-                                <div class="flex gap-[2px] items-end h-3">
-                                    ${generateBarHTML(sigProps.bars, sigProps.color)}
-                                </div>
-                                <span class="text-xs font-mono font-medium text-slate-600">${net.level}</span>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-
-            switchUIState('results');
-        }
-
-        // --- Utils ---
-
-        function switchUIState(state) {
-            [elStateInit, elStateLoad, elStateErr, elStateRes].forEach(el => el.classList.add('hidden'));
-            if (state === 'loading') elStateLoad.classList.remove('hidden');
-            else if (state === 'error') elStateErr.classList.remove('hidden');
-            else if (state === 'results') elStateRes.classList.remove('hidden');
-            else elStateInit.classList.remove('hidden');
-        }
-
-        function getTechStyle(tech) {
-            const t = tech.toLowerCase();
-            if (t.includes('fiber')) return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-            if (t.includes('cable')) return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
-            if (t.includes('dsl') || t.includes('copper')) return 'bg-amber-50 text-amber-700 border border-amber-200';
-            return 'bg-slate-100 text-slate-700 border border-slate-200';
-        }
-
-        function getSignalBars(level) {
-            const l = level.toLowerCase();
-            if (l.includes('excellent')) return { bars: 4, color: 'bg-emerald-500' };
-            if (l.includes('strong')) return { bars: 3, color: 'bg-indigo-500' };
-            if (l.includes('good')) return { bars: 2, color: 'bg-amber-500' };
-            if (l.includes('fair') || l.includes('weak')) return { bars: 1, color: 'bg-red-500' };
-            return { bars: 0, color: 'bg-slate-300' };
-        }
-
-        function generateBarHTML(activeCount, colorClass) {
-            let html = '';
+            const sigRow = document.createElement('div'); sigRow.className = 'signal-row';
+            const bars = document.createElement('div'); bars.className = 'bars';
             for (let i = 1; i <= 4; i++) {
-                const isActive = i <= activeCount;
-                html += `<div class="w-1 rounded-[1px] ${isActive ? colorClass : 'bg-slate-200'}" style="height: ${i * 25}%"></div>`;
+                const b = document.createElement('div'); b.className = 'bar';
+                const active = i <= sig.bars;
+                b.style.cssText = `height:${i * 25}%;background:${active ? sig.color : 'var(--border-sub)'};`;
+                bars.appendChild(b);
             }
-            return html;
-        }
-    </script>
+
+            const lvlEl = document.createElement('span'); lvlEl.className = 'sig-label';
+            lvlEl.style.color = sig.color;
+            setText(lvlEl, c.level);
+            sigRow.appendChild(bars); sigRow.appendChild(lvlEl);
+
+            if (c.dbm) {
+                const dbmEl = document.createElement('span');
+                dbmEl.className = 'sig-label';
+                dbmEl.style.cssText = 'color:var(--text-3);margin-left:auto;font-size:13px;font-weight:500;';
+                setText(dbmEl, c.dbm);
+                sigRow.appendChild(dbmEl);
+            }
+
+            const summary = document.createElement('div'); summary.className = 'ccard-summary';
+            const techSummary = document.createElement('span');
+            setText(techSummary, `${c.techs.join(' + ')} available`);
+            const levelSummary = document.createElement('span');
+            setText(levelSummary, `Best signal: ${c.level}`);
+            summary.appendChild(techSummary); summary.appendChild(levelSummary);
+
+            card.appendChild(head);
+            card.appendChild(techRow);
+            card.appendChild(sigRow);
+            card.appendChild(summary);
+            link.appendChild(card);
+            elCellGrid.appendChild(link);
+        });
+    }
+}
+
+// ─── Speed row (DOM-built, safe) ──────────────────────────────────
+function buildSpeedRow(label, mbps, color) {
+    const MAX_MBPS  = 10000;
+    const pct       = Math.min(100, Math.max(0, (mbps / MAX_MBPS) * 100));
+
+    const row    = document.createElement('div'); row.className = 'speed-row';
+    const meta   = document.createElement('div'); meta.className = 'speed-meta';
+
+    const lbl    = document.createElement('span'); lbl.className = 'speed-lbl'; setText(lbl, label);
+    const valWrap = document.createElement('span'); valWrap.className = 'speed-val';
+    const valNum  = document.createTextNode(`${mbps} `);
+    const valUnit = document.createElement('span'); valUnit.className = 'speed-unit'; setText(valUnit, 'Mbps');
+    valWrap.appendChild(valNum); valWrap.appendChild(valUnit);
+
+    meta.appendChild(lbl); meta.appendChild(valWrap);
+
+    const track = document.createElement('div'); track.className = 'speed-track';
+    const fill  = document.createElement('div'); fill.className  = 'speed-bar';
+    // color is an internal CSS variable string from techBarColor() — never from API input
+    fill.style.cssText = `width:${pct}%;background:${color};`;
+    track.appendChild(fill);
+
+    row.appendChild(meta); row.appendChild(track);
+    return row;
+}
+
+// ─── Utils ────────────────────────────────────────────────────────
+function techBadge(tech) {
+    const t = tech.toLowerCase();
+    if (t.includes('fiber'))                     return 'b-fiber';
+    if (t.includes('cable'))                     return 'b-cable';
+    if (t.includes('dsl') || t.includes('copper')) return 'b-dsl';
+    if (t.includes('wireless') || t.includes('fixed')) return 'b-wireless';
+    if (t.includes('satellite'))                 return 'b-sat';
+    return 'b-default';
+}
+
+function techBarColor(tech) {
+    const t = tech.toLowerCase();
+    if (t.includes('fiber'))                     return 'var(--green)';
+    if (t.includes('cable'))                     return 'var(--blue)';
+    if (t.includes('dsl') || t.includes('copper')) return 'var(--amber)';
+    if (t.includes('wireless') || t.includes('fixed')) return 'var(--purple)';
+    if (t.includes('satellite'))                 return 'var(--pink)';
+    return 'var(--text-3)';
+}
+
+function signalProps(level) {
+    const l = String(level).toLowerCase();
+    if (l.includes('excellent')) return { bars: 4, color: 'var(--green)'  };
+    if (l.includes('strong'))    return { bars: 3, color: 'var(--blue)'   };
+    if (l.includes('good'))      return { bars: 2, color: 'var(--amber)'  };
+    if (l.includes('fair') || l.includes('weak'))
+                                 return { bars: 1, color: 'var(--red)'    };
+    return                              { bars: 0, color: 'var(--border-mid)' };
+}
+</script>
 </body>
 </html>
