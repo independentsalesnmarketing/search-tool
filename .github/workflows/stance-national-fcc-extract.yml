@@ -1,0 +1,25 @@
+name: Stance nationwide FCC extraction
+on:
+  push:
+    branches: [stance-national-fcc-data-2026]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - run: python scripts/stance_extract_esri.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stance-national-fcc-records
+          path: out/
+          if-no-files-found: warn
+          retention-days: 7
